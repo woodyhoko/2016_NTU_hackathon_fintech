@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PID Dynamic Pricing — NTU Fintech Hackathon 2016</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:#0d1117;color:#e6edf3;font-family:"Segoe UI",system-ui,sans-serif;padding:20px;min-height:100vh}
+  h1{font-size:20px;margin-bottom:4px;color:#58a6ff}
+  .sub{color:#8b949e;font-size:13px;margin-bottom:20px}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px}
+  @media(max-width:700px){.grid{grid-template-columns:1fr}}
+  .card{background:#161b22;border:1px solid #30363d;border-radius:12px;padding:16px}
+  h2{font-size:14px;color:#8b949e;margin-bottom:12px;font-weight:600;text-transform:uppercase;letter-spacing:.5px}
+  canvas{width:100%;display:block;border-radius:6px;background:#0d1117}
+  .controls{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end}
+  label{font-size:12px;color:#8b949e;display:block;margin-bottom:4px}
+  input[type=range]{width:160px;accent-color:#58a6ff;display:block}
+  input[type=number]{width:80px;background:#0d1117;border:1px solid #30363d;border-radius:6px;color:#e6edf3;padding:5px 8px;font-size:13px}
+  select{background:#0d1117;border:1px solid #30363d;border-radius:6px;color:#e6edf3;padding:5px 8px;font-size:13px}
+  button{padding:8px 18px;border:none;border-radius:8px;cursor:pointer;background:#58a6ff;color:#0d1117;font-weight:700;font-size:13px;transition:.15s}
+  button:hover{filter:brightness(1.1)}
+  .vals{display:flex;gap:20px;flex-wrap:wrap;margin-top:12px}
+  .val{font-size:13px}
+  .val b{color:#58a6ff;font-variant-numeric:tabular-nums}
+  .legend{font-size:11px;color:#8b949e;margin-top:8px;display:flex;gap:12px;flex-wrap:wrap}
+  .leg{display:flex;align-items:center;gap:5px}
+  .sq{width:10px;height:10px;border-radius:2px;flex:0 0 10px}
+</style>
+</head>
+<body>
+<h1>PID Dynamic Pricing</h1>
+<p class="sub">NTU Fintech Hackathon 2016 — control-theory pricing simulation. Adjust PID gains and watch surplus dynamics evolve.</p>
+
+<div style="margin-bottom:16px" class="card">
+  <div class="controls">
+    <div>
+      <label>Product class</label>
+      <select id="cls"><option value="a">A — low elasticity</option><option value="b" selected>B — medium elasticity</option><option value="c">C — high elasticity</option></select>
+    </div>
+    <div>
+      <label>Kp (proportional) — <span id="kpv">0.40</span></label>
+      <input id="kp" type="range" min="0" max="100" value="40">
+    </div>
+    <div>
+      <label>Ki (integral) — <span id="kiv">0.05</span></label>
+      <input id="ki" type="range" min="0" max="50" value="5">
+    </div>
+    <div>
+      <label>Kd (derivative) — <span id="kdv">0.10</span></label>
+      <input id="kd" type="range" min="0" max="100" value="10">
+    </div>
+    <div>
+      <label>Steps</label>
+      <input id="steps" type="number" value="96" min="24" max="300" step="12">
+    </div>
+    <button id="run">Run Simulation</button>
+  </div>
+  <div class="vals">
+    <div class="val">Consumer surplus Δ: <b id="cs">—</b></div>
+    <div class="val">Producer surplus Δ: <b id="ps">—</b></div>
+    <div class="val">Total surplus: <b id="ts">—</b></div>
+    <div class="val">Convergence step: <b id="cv">—</b></div>
+  </div>
+</div>
+
+<div class="grid">
+  <div class="card">
+    <h2>Price Trajectory</h2>
+    <canvas id="price" height="200"></canvas>
+    <div class="legend">
+      <div class="leg"><div class="sq" style="background:#58a6ff"></div>PID-controlled price</div>
+      <div class="leg"><div class="sq" style="background:#f85149"></div>Baseline (no control)</div>
+      <div class="leg"><div class="sq" style="background:#3fb950"></div>Equilibrium target</div>
+    </div>
+  </div>
+  <div class="card">
+    <h2>Error Signal</h2>
+    <canvas id="error" height="200"></canvas>
+    <div class="legend">
+      <div class="leg"><div class="sq" style="background:#d29922"></div>Error (target − price)</div>
+      <div class="leg"><div class="sq" style="background:#a371f7"></div>Integral accumulation</div>
+    </div>
+  </div>
+  <div class="card">
+    <h2>Consumer & Producer Surplus</h2>
+    <canvas id="surplus" height="200"></canvas>
+    <div class="legend">
+      <div class="leg"><div class="sq" style="background:#58a6ff"></div>Consumer (PID)</div>
+      <div class="leg"><div class="sq" style="background:#3fb950"></div>Producer (PID)</div>
+      <div class="leg"><div class="sq" style="background:#f85149"></div>Consumer (baseline)</div>
+    </div>
+  </div>
+  <div class="card">
+    <h2>Cumulative Total Surplus</h2>
+    <canvas id="total" height="200"></canvas>
+    <div class="legend">
+      <div class="leg"><div class="sq" style="background:#58a6ff"></div>PID total surplus</div>
+      <div class="leg"><div class="sq" style="background:#f85149"></div>Baseline total surplus</div>
+    </div>
+  </div>
+</div>
+
+<script>
+// Product class elasticity profiles
+const CLASSES = {
+  a: { elasticity: 0.3, demandGrowth: 0.008, supplyGap: 0.12 },
+  b: { elasticity: 0.6, demandGrowth: 0.015, supplyGap: 0.10 },
+  c: { elasticity: 1.1, demandGrowth: 0.022, supplyGap: 0.08 }
+};
+
+function simulate(Kp, Ki, Kd, steps, cls) {
+  const { elasticity, demandGrowth, supplyGap } = CLASSES[cls];
+  const P0 = 100, target0 = 105;
+  let price = P0, integral = 0, prevErr = 0;
+  const out = { price: [P0], base: [P0], err: [], integ: [], cSurp: [], pSurp: [], cBase: [], tot: [], totBase: [] };
+  let basePrice = P0;
+  let cCum = 0, pCum = 0, cBaseCum = 0, totCum = 0, totBaseCum = 0;
+
+  for (let t = 1; t <= steps; t++) {
+    // Moving equilibrium target (demand shifts upward over time)
+    const target = target0 + t * demandGrowth * 10 + supplyGap * 10 * Math.sin(t / 8);
+    const err = target - price;
+    integral += err;
+    const derivative = err - prevErr;
+    prevErr = err;
+    const adjustment = Kp * err + Ki * integral + Kd * derivative;
+    price = Math.max(50, Math.min(200, price + adjustment * 0.08));
+    // Baseline: naive price tracks demand with lag
+    basePrice = basePrice + (target - basePrice) * 0.12 + (Math.random() - 0.5) * 2;
+    // Surplus (simplified: CS = (target-price)*elasticity, PS = (price-cost)*quantity)
+    const cost = 70, q = Math.max(0, 1 - elasticity * (price - target) / 100);
+    const qBase = Math.max(0, 1 - elasticity * (basePrice - target) / 100);
+    const cs = (target - price) * q * elasticity;
+    const ps = (price - cost) * q;
+    const csBase = (target - basePrice) * qBase * elasticity;
+    cCum += cs; pCum += ps; cBaseCum += csBase; totCum += cs + ps; totBaseCum += csBase + (basePrice - cost) * qBase;
+    out.price.push(price); out.base.push(basePrice);
+    out.err.push(err); out.integ.push(integral * 0.1);
+    out.cSurp.push(cs); out.pSurp.push(ps); out.cBase.push(csBase);
+    out.tot.push(totCum); out.totBase.push(totBaseCum);
+  }
+  return { out, cCum, pCum, totCum };
+}
+
+function lineChart(canvasId, series, colors, yLabel) {
+  const cv = document.getElementById(canvasId);
+  const ctx = cv.getContext('2d');
+  const W = cv.clientWidth * devicePixelRatio, H = cv.clientHeight * devicePixelRatio;
+  cv.width = W; cv.height = H;
+  const pad = { l: 42, r: 12, t: 12, b: 28 };
+  const allVals = series.flat();
+  const mn = Math.min(...allVals), mx = Math.max(...allVals);
+  const rng = mx - mn || 1;
+  const xOf = i => pad.l + (i / (series[0].length - 1)) * (W - pad.l - pad.r);
+  const yOf = v => pad.t + (1 - (v - mn) / rng) * (H - pad.t - pad.b);
+  ctx.fillStyle = '#0d1117'; ctx.fillRect(0, 0, W, H);
+  // grid
+  ctx.strokeStyle = '#21262d'; ctx.lineWidth = 1;
+  for (let i = 0; i <= 4; i++) { const y = pad.t + i * (H - pad.t - pad.b) / 4; ctx.beginPath(); ctx.moveTo(pad.l, y); ctx.lineTo(W - pad.r, y); ctx.stroke(); }
+  // y labels
+  ctx.fillStyle = '#8b949e'; ctx.font = `${10 * devicePixelRatio}px monospace`;
+  for (let i = 0; i <= 4; i++) { const v = mx - i * rng / 4; const y = pad.t + i * (H - pad.t - pad.b) / 4; ctx.fillText(v.toFixed(0), 2, y + 4); }
+  // series
+  series.forEach((s, si) => {
+    ctx.beginPath(); ctx.strokeStyle = colors[si]; ctx.lineWidth = 2 * devicePixelRatio;
+    s.forEach((v, i) => { i ? ctx.lineTo(xOf(i), yOf(v)) : ctx.moveTo(xOf(i), yOf(v)); }); ctx.stroke();
+  });
+  // x axis
+  ctx.strokeStyle = '#30363d'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(pad.l, H - pad.b); ctx.lineTo(W - pad.r, H - pad.b); ctx.stroke();
+}
+
+function runSim() {
+  const Kp = document.getElementById('kp').value / 100;
+  const Ki = document.getElementById('ki').value / 1000;
+  const Kd = document.getElementById('kd').value / 100;
+  const steps = +document.getElementById('steps').value;
+  const cls = document.getElementById('cls').value;
+  const { out, cCum, pCum, totCum } = simulate(Kp, Ki, Kd, steps, cls);
+  lineChart('price', [out.price, out.base], ['#58a6ff', '#f85149'], 'Price');
+  lineChart('error', [out.err, out.integ], ['#d29922', '#a371f7'], 'Error');
+  lineChart('surplus', [out.cSurp, out.pSurp, out.cBase], ['#58a6ff', '#3fb950', '#f85149'], 'Surplus');
+  lineChart('total', [out.tot, out.totBase], ['#58a6ff', '#f85149'], 'Cumulative');
+  document.getElementById('cs').textContent = cCum.toFixed(1);
+  document.getElementById('ps').textContent = pCum.toFixed(1);
+  document.getElementById('ts').textContent = totCum.toFixed(1);
+  const convStep = out.err.findIndex((e, i) => i > 5 && Math.abs(e) < 2);
+  document.getElementById('cv').textContent = convStep > 0 ? 'step ' + convStep : 'no convergence';
+}
+['kp','ki','kd'].forEach(id=>{
+  document.getElementById(id).oninput=e=>{document.getElementById(id+'v').textContent=(+e.target.value/(id==='ki'?1000:100)).toFixed(id==='ki'?3:2)};
+});
+document.getElementById('run').onclick = runSim;
+runSim();
+</script>
+</body>
+</html>
