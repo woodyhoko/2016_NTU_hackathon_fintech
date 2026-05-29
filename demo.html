@@ -3,196 +3,378 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>PID Dynamic Pricing — NTU Fintech Hackathon 2016</title>
+<title>PID Perishable Pricing — NTU Fintech Hackathon 2016</title>
 <style>
+  :root{
+    --bg:#0a0e16; --panel:#121826; --panel2:#0e1420; --line:#222b3d;
+    --txt:#e8edf6; --muted:#8b96ab; --faint:#5d6679;
+    --pid:#38bdf8; --pidf:rgba(56,189,248,.16);
+    --cls:#fb7185; --clsf:rgba(251,113,133,.15);
+    --good:#34d399; --val:#7d8597;
+  }
   *{box-sizing:border-box;margin:0;padding:0}
-  body{background:#0d1117;color:#e6edf3;font-family:"Segoe UI",system-ui,sans-serif;padding:20px;min-height:100vh}
-  h1{font-size:20px;margin-bottom:4px;color:#58a6ff}
-  .sub{color:#8b949e;font-size:13px;margin-bottom:20px}
-  .grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px}
-  @media(max-width:700px){.grid{grid-template-columns:1fr}}
-  .card{background:#161b22;border:1px solid #30363d;border-radius:12px;padding:16px}
-  h2{font-size:14px;color:#8b949e;margin-bottom:12px;font-weight:600;text-transform:uppercase;letter-spacing:.5px}
-  canvas{width:100%;display:block;border-radius:6px;background:#0d1117}
-  .controls{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end}
-  label{font-size:12px;color:#8b949e;display:block;margin-bottom:4px}
-  input[type=range]{width:160px;accent-color:#58a6ff;display:block}
-  input[type=number]{width:80px;background:#0d1117;border:1px solid #30363d;border-radius:6px;color:#e6edf3;padding:5px 8px;font-size:13px}
-  select{background:#0d1117;border:1px solid #30363d;border-radius:6px;color:#e6edf3;padding:5px 8px;font-size:13px}
-  button{padding:8px 18px;border:none;border-radius:8px;cursor:pointer;background:#58a6ff;color:#0d1117;font-weight:700;font-size:13px;transition:.15s}
-  button:hover{filter:brightness(1.1)}
-  .vals{display:flex;gap:20px;flex-wrap:wrap;margin-top:12px}
-  .val{font-size:13px}
-  .val b{color:#58a6ff;font-variant-numeric:tabular-nums}
-  .legend{font-size:11px;color:#8b949e;margin-top:8px;display:flex;gap:12px;flex-wrap:wrap}
-  .leg{display:flex;align-items:center;gap:5px}
-  .sq{width:10px;height:10px;border-radius:2px;flex:0 0 10px}
+  body{
+    background:radial-gradient(1200px 600px at 80% -10%,#13203a 0%,var(--bg) 55%) fixed,var(--bg);
+    color:var(--txt);font-family:"Inter","Segoe UI",system-ui,sans-serif;
+    padding:28px 22px 40px;min-height:100vh;-webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:1180px;margin:0 auto}
+  h1{font-size:24px;font-weight:800;letter-spacing:-.02em;
+     background:linear-gradient(90deg,#7dd3fc,#38bdf8 45%,#a78bfa);
+     -webkit-background-clip:text;background-clip:text;color:transparent;margin-bottom:6px}
+  .sub{color:var(--muted);font-size:13.5px;line-height:1.6;max-width:820px;margin-bottom:22px}
+  .sub b{color:var(--txt);font-weight:600}
+
+  /* KPI strip */
+  .kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:18px}
+  @media(max-width:780px){.kpis{grid-template-columns:repeat(2,1fr)}}
+  .kpi{position:relative;background:linear-gradient(180deg,var(--panel),var(--panel2));
+       border:1px solid var(--line);border-radius:14px;padding:15px 16px;overflow:hidden}
+  .kpi::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--accent,var(--pid))}
+  .kpi .lab{font-size:10.5px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:8px}
+  .kpi .num{font-size:25px;font-weight:800;letter-spacing:-.02em;font-variant-numeric:tabular-nums;line-height:1}
+  .kpi .note{font-size:11.5px;color:var(--faint);margin-top:7px}
+  .kpi.hero{--accent:var(--good)} .kpi.hero .num{color:var(--good)}
+  .kpi .pidc{color:var(--pid)} .kpi .clsc{color:var(--cls)}
+
+  /* cards */
+  .charts{display:grid;grid-template-columns:1.25fr 1fr;gap:16px;align-items:start}
+  @media(max-width:880px){.charts{grid-template-columns:1fr}}
+  .card{background:linear-gradient(180deg,var(--panel),var(--panel2));
+        border:1px solid var(--line);border-radius:16px;padding:16px 16px 14px}
+  .card h2{font-size:12.5px;color:var(--muted);font-weight:600;text-transform:uppercase;
+           letter-spacing:.06em;margin-bottom:2px}
+  .card .desc{font-size:11.5px;color:var(--faint);margin-bottom:12px}
+  canvas{width:100%;display:block}
+  .panel-lab{font-size:10.5px;color:var(--faint);margin:6px 0 2px;text-transform:uppercase;letter-spacing:.05em}
+  .legend{font-size:11px;color:var(--muted);margin-top:12px;display:flex;gap:16px;flex-wrap:wrap}
+  .leg{display:flex;align-items:center;gap:6px}
+  .sq{width:18px;height:10px;border-radius:3px;flex:0 0 18px}
+  .sq.band{opacity:.9}
+  .dash{width:18px;height:0;border-top:2px dashed var(--val);flex:0 0 18px}
+
+  /* controls */
+  .controls{background:linear-gradient(180deg,var(--panel),var(--panel2));
+            border:1px solid var(--line);border-radius:16px;padding:16px 18px;margin-bottom:18px}
+  .ctl-row{display:flex;flex-wrap:wrap;gap:18px 22px;align-items:flex-end}
+  .grp{display:flex;flex-wrap:wrap;gap:18px 22px;align-items:flex-end;padding-right:22px;border-right:1px solid var(--line)}
+  .grp:last-of-type{border-right:none}
+  .field label{font-size:11px;color:var(--muted);display:block;margin-bottom:6px}
+  .field .v{color:var(--pid);font-weight:700;font-variant-numeric:tabular-nums}
+  input[type=range]{width:140px;accent-color:var(--pid);display:block;cursor:pointer}
+  input[type=number]{width:72px;background:var(--bg);border:1px solid var(--line);border-radius:8px;
+                     color:var(--txt);padding:6px 9px;font-size:13px}
+  select{background:var(--bg);border:1px solid var(--line);border-radius:8px;color:var(--txt);
+         padding:6px 9px;font-size:13px}
+  .actions{margin-left:auto;display:flex;flex-direction:column;align-items:flex-end;gap:7px}
+  button{padding:10px 22px;border:none;border-radius:10px;cursor:pointer;
+         background:linear-gradient(90deg,#38bdf8,#818cf8);color:#06101f;font-weight:800;font-size:13px;
+         box-shadow:0 4px 16px rgba(56,189,248,.25);transition:.15s}
+  button:hover{filter:brightness(1.08);transform:translateY(-1px)}
+  button:disabled{opacity:.6;cursor:default;transform:none;box-shadow:none}
+  button.ghost{background:transparent;color:var(--pid);border:1px solid var(--pid);box-shadow:none}
+  button.ghost:hover{background:rgba(56,189,248,.1)}
+  #tuneNote{font-size:10.5px;color:var(--good);min-height:13px;font-variant-numeric:tabular-nums}
+  .grp-tag{width:100%;font-size:10px;text-transform:uppercase;letter-spacing:.1em;color:var(--faint);margin-bottom:-6px}
 </style>
 </head>
 <body>
-<h1>PID Dynamic Pricing</h1>
-<p class="sub">NTU Fintech Hackathon 2016 — control-theory pricing simulation. Adjust PID gains and watch surplus dynamics evolve.</p>
+<div class="wrap">
+  <h1>PID Perishable Pricing</h1>
+  <p class="sub">
+    NTU Fintech Hackathon 2016. A grocery item is stocked with a fixed shelf life and loses value as it nears expiry —
+    <b>linearly</b> for produce and dairy, <b>exponentially</b> for meat and seafood (from the willingness-to-pay-for-freshness
+    literature). <b>Classical pricing</b> holds the sticker flat and marks down <em>once</em>, late — so much of the stock
+    spoils. A <b>PID controller</b> eases the price down continuously to track a convex ideal sell-down (sell faster while
+    fresh), clearing inventory right by expiry and balancing customer happiness against shop happiness. Every season is
+    replayed many times; the shaded bands show the <b>P10–P90 uncertainty</b>. Hit <b>Auto-tune ✦</b> to search the gain
+    space for the Kp/Ki/Kd that maximise net welfare with smooth, stable pricing.
+  </p>
 
-<div style="margin-bottom:16px" class="card">
+  <!-- KPI strip -->
+  <div class="kpis">
+    <div class="kpi hero">
+      <div class="lab">Extra welfare from PID</div>
+      <div class="num" id="kGap">—</div>
+      <div class="note" id="kGapNote">per season vs classical</div>
+    </div>
+    <div class="kpi">
+      <div class="lab">PID beats classical</div>
+      <div class="num pidc" id="kWin">—</div>
+      <div class="note">of all Monte-Carlo runs</div>
+    </div>
+    <div class="kpi" style="--accent:var(--cls)">
+      <div class="lab">Stock spoiled</div>
+      <div class="num"><span class="pidc" id="kWp">—</span> <span style="color:var(--faint);font-size:16px">vs</span> <span class="clsc" id="kWc">—</span></div>
+      <div class="note">PID vs classical (of initial stock)</div>
+    </div>
+    <div class="kpi">
+      <div class="lab">Net welfare / season</div>
+      <div class="num"><span class="pidc" id="kNp">—</span> <span style="color:var(--faint);font-size:16px">/</span> <span class="clsc" id="kNc">—</span></div>
+      <div class="note">PID stays positive; classical loses to spoilage</div>
+    </div>
+  </div>
+
+  <!-- controls -->
   <div class="controls">
-    <div>
-      <label>Product class</label>
-      <select id="cls"><option value="a">A — low elasticity</option><option value="b" selected>B — medium elasticity</option><option value="c">C — high elasticity</option></select>
+    <div class="ctl-row">
+      <div class="grp">
+        <div class="grp-tag">Scenario</div>
+        <div class="field"><label>Product</label>
+          <select id="cls"><option value="milk">Milk — dairy</option><option value="banana" selected>Bananas — produce</option><option value="bread">Bread — bakery</option><option value="fish">Fresh fish — seafood</option></select></div>
+        <div class="field"><label>Shelf life <span class="v" id="tv">14</span> d</label><input id="shelf" type="range" min="3" max="30" value="14"></div>
+        <div class="field"><label>Initial stock <span class="v" id="iv">200</span></label><input id="invR" type="range" min="60" max="400" value="200" step="10"></div>
+        <div class="field"><label>Daily footfall <span class="v" id="fv">45</span></label><input id="foot" type="range" min="15" max="90" value="45"></div>
+        <div class="field"><label>Classical markdown <span class="v" id="dv">50</span>%</label><input id="depth" type="range" min="10" max="80" value="50"></div>
+      </div>
+      <div class="grp">
+        <div class="grp-tag">PID tuning</div>
+        <div class="field"><label>Kp <span class="v" id="kpv">0.200</span></label><input id="kp" type="range" min="0" max="1200" value="200"></div>
+        <div class="field"><label>Ki <span class="v" id="kiv">0.005</span></label><input id="ki" type="range" min="0" max="300" value="5"></div>
+        <div class="field"><label>Kd <span class="v" id="kdv">0.020</span></label><input id="kd" type="range" min="0" max="1500" value="20"></div>
+        <div class="field"><label>Runs</label><input id="runs" type="number" value="300" min="20" max="2000" step="20"></div>
+      </div>
+      <div class="actions">
+        <div style="display:flex;gap:10px">
+          <button id="tune" class="ghost">Auto-tune ✦</button>
+          <button id="run">Run ▸</button>
+        </div>
+        <div id="tuneNote"></div>
+      </div>
     </div>
-    <div>
-      <label>Kp (proportional) — <span id="kpv">0.40</span></label>
-      <input id="kp" type="range" min="0" max="100" value="40">
-    </div>
-    <div>
-      <label>Ki (integral) — <span id="kiv">0.05</span></label>
-      <input id="ki" type="range" min="0" max="50" value="5">
-    </div>
-    <div>
-      <label>Kd (derivative) — <span id="kdv">0.10</span></label>
-      <input id="kd" type="range" min="0" max="100" value="10">
-    </div>
-    <div>
-      <label>Steps</label>
-      <input id="steps" type="number" value="96" min="24" max="300" step="12">
-    </div>
-    <button id="run">Run Simulation</button>
   </div>
-  <div class="vals">
-    <div class="val">Consumer surplus Δ: <b id="cs">—</b></div>
-    <div class="val">Producer surplus Δ: <b id="ps">—</b></div>
-    <div class="val">Total surplus: <b id="ts">—</b></div>
-    <div class="val">Convergence step: <b id="cv">—</b></div>
-  </div>
-</div>
 
-<div class="grid">
-  <div class="card">
-    <h2>Price Trajectory</h2>
-    <canvas id="price" height="200"></canvas>
-    <div class="legend">
-      <div class="leg"><div class="sq" style="background:#58a6ff"></div>PID-controlled price</div>
-      <div class="leg"><div class="sq" style="background:#f85149"></div>Baseline (no control)</div>
-      <div class="leg"><div class="sq" style="background:#3fb950"></div>Equilibrium target</div>
+  <!-- charts -->
+  <div class="charts">
+    <div class="card">
+      <h2>Price &amp; inventory over the shelf life</h2>
+      <div class="desc">Value fades <span id="decayLab">linearly</span> for this product; median trajectory with the P10–P90 band across runs. Classical holds, then drops once near expiry.</div>
+      <div class="panel-lab">Price ($)</div>
+      <canvas id="priceC"></canvas>
+      <div class="panel-lab" style="margin-top:10px">Inventory remaining</div>
+      <canvas id="invC"></canvas>
+      <div class="legend">
+        <div class="leg"><div class="sq band" style="background:var(--pid)"></div>PID</div>
+        <div class="leg"><div class="sq band" style="background:var(--cls)"></div>Classical</div>
+        <div class="leg"><div class="dash" style="border-color:var(--val)"></div>Item value</div>
+        <div class="leg"><div class="dash" style="border-color:var(--good)"></div>Ideal sell-down</div>
+      </div>
     </div>
-  </div>
-  <div class="card">
-    <h2>Error Signal</h2>
-    <canvas id="error" height="200"></canvas>
-    <div class="legend">
-      <div class="leg"><div class="sq" style="background:#d29922"></div>Error (target − price)</div>
-      <div class="leg"><div class="sq" style="background:#a371f7"></div>Integral accumulation</div>
-    </div>
-  </div>
-  <div class="card">
-    <h2>Consumer & Producer Surplus</h2>
-    <canvas id="surplus" height="200"></canvas>
-    <div class="legend">
-      <div class="leg"><div class="sq" style="background:#58a6ff"></div>Consumer (PID)</div>
-      <div class="leg"><div class="sq" style="background:#3fb950"></div>Producer (PID)</div>
-      <div class="leg"><div class="sq" style="background:#f85149"></div>Consumer (baseline)</div>
-    </div>
-  </div>
-  <div class="card">
-    <h2>Cumulative Total Surplus</h2>
-    <canvas id="total" height="200"></canvas>
-    <div class="legend">
-      <div class="leg"><div class="sq" style="background:#58a6ff"></div>PID total surplus</div>
-      <div class="leg"><div class="sq" style="background:#f85149"></div>Baseline total surplus</div>
+
+    <div class="card">
+      <h2>Net-welfare outcomes across runs</h2>
+      <div class="desc">Distribution of each season's net welfare. PID's whole spread sits to the right of classical's.</div>
+      <canvas id="distC"></canvas>
+      <div class="legend">
+        <div class="leg"><div class="sq" style="background:var(--pid)"></div>PID seasons</div>
+        <div class="leg"><div class="sq" style="background:var(--cls)"></div>Classical seasons</div>
+        <div class="leg"><div class="dash" style="border-color:#fff;opacity:.5"></div>medians</div>
+      </div>
+      <div class="desc" style="margin:14px 0 0;line-height:1.6">
+        Net welfare = consumer surplus + shop margin − spoilage loss. Both strategies face the
+        <b style="color:var(--txt)">same</b> demand each run, so the gap is a clean head-to-head.
+      </div>
     </div>
   </div>
 </div>
 
 <script>
-// Product class elasticity profiles
-const CLASSES = {
-  a: { elasticity: 0.3, demandGrowth: 0.008, supplyGap: 0.12 },
-  b: { elasticity: 0.6, demandGrowth: 0.015, supplyGap: 0.10 },
-  c: { elasticity: 1.1, demandGrowth: 0.022, supplyGap: 0.08 }
+const C = getComputedStyle(document.documentElement);
+const COL = {
+  pid:C.getPropertyValue('--pid').trim(), pidf:'rgba(56,189,248,.16)',
+  cls:C.getPropertyValue('--cls').trim(), clsf:'rgba(251,113,133,.15)',
+  good:C.getPropertyValue('--good').trim(), val:C.getPropertyValue('--val').trim(),
+  grid:'rgba(255,255,255,.05)', ax:'#5d6679'
 };
 
-function simulate(Kp, Ki, Kd, steps, cls) {
-  const { elasticity, demandGrowth, supplyGap } = CLASSES[cls];
-  const P0 = 100, target0 = 105;
-  let price = P0, integral = 0, prevErr = 0;
-  const out = { price: [P0], base: [P0], err: [], integ: [], cSurp: [], pSurp: [], cBase: [], tot: [], totBase: [] };
-  let basePrice = P0;
-  let cCum = 0, pCum = 0, cBaseCum = 0, totCum = 0, totBaseCum = 0;
+// ---- model (identical to auto_pricing.py) ----
+// Example grocery items. decay shape & rate from the WTP-for-freshness literature:
+//   produce/dairy lose value ~linearly, meat/seafood ~exponentially (Sumner et al.;
+//   Ghare & Schrader 1963 deteriorating-inventory model). `drop` = value lost by expiry,
+//   `gamma` = curvature of the ideal sell-down (0 = linear; higher = clear faster while fresh).
+const PRODUCTS = {
+  milk:   {name:'Milk — dairy staple',  eta:0.35, decay:'linear', drop:0.45, gamma:0.8, shelf:14, stock:240, foot:55},
+  banana: {name:'Bananas — produce',    eta:0.60, decay:'linear', drop:0.55, gamma:1.1, shelf:8,  stock:200, foot:50},
+  bread:  {name:'Bread — bakery',       eta:0.70, decay:'exp',    drop:0.55, gamma:1.8, shelf:5,  stock:160, foot:55},
+  fish:   {name:'Fresh fish — seafood', eta:1.10, decay:'exp',    drop:0.62, gamma:2.4, shelf:3,  stock:90,  foot:48}
+};
+function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
+const clamp01 = x => x<0?0:x>1?1:x;
+const clamp = (x,a,b) => x<a?a:x>b?b:x;
+// Item value as it ages: linear (produce/dairy) or exponential (meat/seafood); both reach V0*(1-drop) at expiry.
+function dayValue(P,t){const tau=t/P.T; return P.decay==='linear' ? P.V0*(1-P.drop*tau) : P.V0*Math.pow(1-P.drop,tau);}
+// Ideal sell-down (PID setpoint): convex depletion from deteriorating-inventory theory — sell faster while fresh.
+function idealStock(P,t){const tau=t/P.T,g=P.gamma; return g<1e-6 ? P.I0*(1-tau) : P.I0*(Math.exp(g*(1-tau))-1)/(Math.exp(g)-1);}
+// Classical clearance: flat list price, then one partial and one deep markdown in the final stretch.
+// r=(t+1)/T is the fraction of shelf life elapsed by end of day t, so even short-life items mark down.
+function classicalPrice(p0,t,T,depth){const r=(t+1)/T;if(r<=0.7)return p0;if(r<=0.9)return p0*(1+depth)/2;return p0*depth;}
 
-  for (let t = 1; t <= steps; t++) {
-    // Moving equilibrium target (demand shifts upward over time)
-    const target = target0 + t * demandGrowth * 10 + supplyGap * 10 * Math.sin(t / 8);
-    const err = target - price;
-    integral += err;
-    const derivative = err - prevErr;
-    prevErr = err;
-    const adjustment = Kp * err + Ki * integral + Kd * derivative;
-    price = Math.max(50, Math.min(200, price + adjustment * 0.08));
-    // Baseline: naive price tracks demand with lag
-    basePrice = basePrice + (target - basePrice) * 0.12 + (Math.random() - 0.5) * 2;
-    // Surplus (simplified: CS = (target-price)*elasticity, PS = (price-cost)*quantity)
-    const cost = 70, q = Math.max(0, 1 - elasticity * (price - target) / 100);
-    const qBase = Math.max(0, 1 - elasticity * (basePrice - target) / 100);
-    const cs = (target - price) * q * elasticity;
-    const ps = (price - cost) * q;
-    const csBase = (target - basePrice) * qBase * elasticity;
-    cCum += cs; pCum += ps; cBaseCum += csBase; totCum += cs + ps; totBaseCum += csBase + (basePrice - cost) * qBase;
-    out.price.push(price); out.base.push(basePrice);
-    out.err.push(err); out.integ.push(integral * 0.1);
-    out.cSurp.push(cs); out.pSurp.push(ps); out.cBase.push(csBase);
-    out.tot.push(totCum); out.totBase.push(totBaseCum);
+function simulate(strat, P, seed){
+  const rng=mulberry32(seed);
+  const {T,I0,footfall,V0,cost,p0,eta,depth,Kp,Ki,Kd,noise}=P;
+  let inv=I0, integral=0, prevErr=0, price=p0, prevP=p0, CS=0, PS=0, effort=0;
+  const arrPrice=[], arrInv=[];
+  const sens=0.5+eta;
+  for(let t=0;t<T;t++){
+    const V=dayValue(P,t), target=idealStock(P,t);
+    if(strat==='classical'){ price=classicalPrice(p0,t,T,depth); }
+    else { const e=inv-target; integral+=e; const der=e-prevErr; prevErr=e;
+           price=Math.max(cost*0.5, Math.min(p0, price - (Kp*e+Ki*integral+Kd*der))); }
+    effort += (price-prevP)*(price-prevP); prevP=price;   // control effort (price volatility)
+    const frac=clamp01((V-price)/V*sens);
+    let q=footfall*(1+noise*(rng()*2-1))*frac; if(q<0)q=0; if(q>inv)q=inv;
+    inv-=q; PS+=(price-cost)*q; CS+=q*(V-price)/2;
+    arrPrice.push(price); arrInv.push(inv);
   }
-  return { out, cCum, pCum, totCum };
+  const waste=inv;
+  return { arrPrice, arrInv, waste, effort, welfare: CS+PS-waste*cost };
 }
 
-function lineChart(canvasId, series, colors, yLabel) {
-  const cv = document.getElementById(canvasId);
-  const ctx = cv.getContext('2d');
-  const W = cv.clientWidth * devicePixelRatio, H = cv.clientHeight * devicePixelRatio;
-  cv.width = W; cv.height = H;
-  const pad = { l: 42, r: 12, t: 12, b: 28 };
-  const allVals = series.flat();
-  const mn = Math.min(...allVals), mx = Math.max(...allVals);
-  const rng = mx - mn || 1;
-  const xOf = i => pad.l + (i / (series[0].length - 1)) * (W - pad.l - pad.r);
-  const yOf = v => pad.t + (1 - (v - mn) / rng) * (H - pad.t - pad.b);
-  ctx.fillStyle = '#0d1117'; ctx.fillRect(0, 0, W, H);
-  // grid
-  ctx.strokeStyle = '#21262d'; ctx.lineWidth = 1;
-  for (let i = 0; i <= 4; i++) { const y = pad.t + i * (H - pad.t - pad.b) / 4; ctx.beginPath(); ctx.moveTo(pad.l, y); ctx.lineTo(W - pad.r, y); ctx.stroke(); }
-  // y labels
-  ctx.fillStyle = '#8b949e'; ctx.font = `${10 * devicePixelRatio}px monospace`;
-  for (let i = 0; i <= 4; i++) { const v = mx - i * rng / 4; const y = pad.t + i * (H - pad.t - pad.b) / 4; ctx.fillText(v.toFixed(0), 2, y + 4); }
-  // series
-  series.forEach((s, si) => {
-    ctx.beginPath(); ctx.strokeStyle = colors[si]; ctx.lineWidth = 2 * devicePixelRatio;
-    s.forEach((v, i) => { i ? ctx.lineTo(xOf(i), yOf(v)) : ctx.moveTo(xOf(i), yOf(v)); }); ctx.stroke();
-  });
-  // x axis
-  ctx.strokeStyle = '#30363d'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(pad.l, H - pad.b); ctx.lineTo(W - pad.r, H - pad.b); ctx.stroke();
+function pct(s,p){const i=(s.length-1)*p,lo=Math.floor(i),hi=Math.ceil(i);return lo===hi?s[lo]:s[lo]+(s[hi]-s[lo])*(i-lo);}
+const avg = a => a.reduce((x,y)=>x+y,0)/a.length;
+
+function monteCarlo(P,N){
+  const T=P.T, cols=()=>Array.from({length:T},()=>[]);
+  const PP=cols(),CP=cols(),PI=cols(),CI=cols(), pidWel=[],clsWel=[];
+  let pidWaste=0,clsWaste=0,wins=0;
+  for(let i=0;i<N;i++){
+    const pid=simulate('pid',P,1000+i), cls=simulate('classical',P,1000+i);
+    for(let t=0;t<T;t++){PP[t].push(pid.arrPrice[t]);CP[t].push(cls.arrPrice[t]);PI[t].push(pid.arrInv[t]);CI[t].push(cls.arrInv[t]);}
+    pidWel.push(pid.welfare); clsWel.push(cls.welfare);
+    pidWaste+=pid.waste; clsWaste+=cls.waste; if(pid.welfare>cls.welfare)wins++;
+  }
+  const band=c=>{const p10=[],p50=[],p90=[];for(let t=0;t<T;t++){const s=c[t].slice().sort((a,b)=>a-b);p10.push(pct(s,.1));p50.push(pct(s,.5));p90.push(pct(s,.9));}return{p10,p50,p90};};
+  return { pidPrice:band(PP),clsPrice:band(CP),pidInv:band(PI),clsInv:band(CI),
+           pidWel,clsWel,pidAvg:avg(pidWel),clsAvg:avg(clsWel),
+           suppressed:pidWel.reduce((a,b)=>a+b,0)-clsWel.reduce((a,b)=>a+b,0),
+           pidWaste:pidWaste/N,clsWaste:clsWaste/N,winRate:wins/N };
 }
 
-function runSim() {
-  const Kp = document.getElementById('kp').value / 100;
-  const Ki = document.getElementById('ki').value / 1000;
-  const Kd = document.getElementById('kd').value / 100;
-  const steps = +document.getElementById('steps').value;
-  const cls = document.getElementById('cls').value;
-  const { out, cCum, pCum, totCum } = simulate(Kp, Ki, Kd, steps, cls);
-  lineChart('price', [out.price, out.base], ['#58a6ff', '#f85149'], 'Price');
-  lineChart('error', [out.err, out.integ], ['#d29922', '#a371f7'], 'Error');
-  lineChart('surplus', [out.cSurp, out.pSurp, out.cBase], ['#58a6ff', '#3fb950', '#f85149'], 'Surplus');
-  lineChart('total', [out.tot, out.totBase], ['#58a6ff', '#f85149'], 'Cumulative');
-  document.getElementById('cs').textContent = cCum.toFixed(1);
-  document.getElementById('ps').textContent = pCum.toFixed(1);
-  document.getElementById('ts').textContent = totCum.toFixed(1);
-  const convStep = out.err.findIndex((e, i) => i > 5 && Math.abs(e) < 2);
-  document.getElementById('cv').textContent = convStep > 0 ? 'step ' + convStep : 'no convergence';
+// ---- auto-tune: find PID gains maximising welfare with smooth (low-volatility) pricing ----
+const LAMBDA = 0.5;   // price-volatility penalty weight
+function tuneObjective(P, Kp, Ki, Kd, M){
+  let s=0;
+  for(let i=0;i<M;i++){ const r=simulate('pid',{...P,Kp,Ki,Kd},1000+i); s += r.welfare - LAMBDA*r.effort; }
+  return s/M;
 }
-['kp','ki','kd'].forEach(id=>{
-  document.getElementById(id).oninput=e=>{document.getElementById(id+'v').textContent=(+e.target.value/(id==='ki'?1000:100)).toFixed(id==='ki'?3:2)};
-});
-document.getElementById('run').onclick = runSim;
-runSim();
+// Compass / pattern search with step halving — robust for 3 gains, ~1000 evals, <10 ms.
+function autoTunePID(P){
+  const M=60, B={Kp:[0.01,1.2], Ki:[0,0.3], Kd:[0,1.5]};
+  let best={Kp:P.Kp,Ki:P.Ki,Kd:P.Kd}, bv=tuneObjective(P,best.Kp,best.Ki,best.Kd,M);
+  let step={Kp:0.3,Ki:0.02,Kd:0.3}; const minS={Kp:0.005,Ki:0.0005,Kd:0.005};
+  for(let it=0; it<120; it++){
+    let improved=false;
+    for(const k of ['Kp','Ki','Kd']) for(const d of [1,-1]){
+      const c={...best}; c[k]=clamp(best[k]+d*step[k], B[k][0], B[k][1]); if(c[k]===best[k]) continue;
+      const v=tuneObjective(P,c.Kp,c.Ki,c.Kd,M);
+      if(v>bv+1e-6){ bv=v; best=c; improved=true; }
+    }
+    if(!improved){ step.Kp*=0.5; step.Ki*=0.5; step.Kd*=0.5;
+      if(step.Kp<minS.Kp && step.Ki<minS.Ki && step.Kd<minS.Kd) break; }
+  }
+  return best;
+}
+
+// ---- rendering ----
+function setup(cv,h){const r=devicePixelRatio||1,W=cv.clientWidth;cv.width=W*r;cv.height=h*r;cv.style.height=h+'px';const ctx=cv.getContext('2d');ctx.setTransform(r,0,0,r,0,0);return{ctx,W,H:h};}
+
+function bandPanel(cv,h,bands,lines,opts){
+  opts=opts||{}; const {ctx,W,H}=setup(cv,h);
+  const pad={l:42,r:10,t:8,b:opts.showX?20:6}, T=bands[0].p50.length;
+  let mn=Infinity,mx=-Infinity; const see=v=>{if(v<mn)mn=v;if(v>mx)mx=v;};
+  bands.forEach(b=>{b.p10.forEach(see);b.p90.forEach(see);}); lines.forEach(l=>l.data.forEach(see));
+  if(opts.y0)mn=Math.min(mn,0);
+  const r=(mx-mn)||1; mn-=r*0.06; mx+=r*0.06; const R=mx-mn;
+  const X=i=>pad.l+(i/(T-1))*(W-pad.l-pad.r), Y=v=>pad.t+(1-(v-mn)/R)*(H-pad.t-pad.b);
+  ctx.clearRect(0,0,W,H);
+  ctx.strokeStyle=COL.grid; ctx.fillStyle=COL.ax; ctx.font='10px ui-monospace,monospace'; ctx.lineWidth=1;
+  for(let i=0;i<=3;i++){const y=pad.t+i*(H-pad.t-pad.b)/3;ctx.beginPath();ctx.moveTo(pad.l,y);ctx.lineTo(W-pad.r,y);ctx.stroke();
+    ctx.fillText((opts.yfmt?opts.yfmt(mx-i*R/3):Math.round(mx-i*R/3)),3,y+3);}
+  bands.forEach(b=>{ctx.beginPath();for(let i=0;i<T;i++){i?ctx.lineTo(X(i),Y(b.p90[i])):ctx.moveTo(X(i),Y(b.p90[i]));}
+    for(let i=T-1;i>=0;i--)ctx.lineTo(X(i),Y(b.p10[i]));ctx.closePath();ctx.fillStyle=b.fill;ctx.fill();});
+  lines.forEach(l=>{ctx.beginPath();ctx.strokeStyle=l.color;ctx.lineWidth=1.5;ctx.setLineDash(l.dash?[5,4]:[]);
+    l.data.forEach((v,i)=>i?ctx.lineTo(X(i),Y(v)):ctx.moveTo(X(i),Y(v)));ctx.stroke();ctx.setLineDash([]);});
+  bands.forEach(b=>{ctx.beginPath();ctx.strokeStyle=b.color;ctx.lineWidth=2.4;
+    b.p50.forEach((v,i)=>i?ctx.lineTo(X(i),Y(v)):ctx.moveTo(X(i),Y(v)));ctx.stroke();});
+  if(opts.showX){ctx.fillStyle=COL.ax;const step=Math.ceil(T/7);for(let i=0;i<T;i+=step)ctx.fillText(i,X(i)-3,H-5);ctx.fillText('day',W-pad.r-22,H-5);}
+}
+
+function distPanel(cv,h,A,B){
+  const {ctx,W,H}=setup(cv,h), pad={l:44,r:12,t:10,b:34}, bins=30;
+  const all=A.concat(B); let mn=Math.min(...all),mx=Math.max(...all); const r=(mx-mn)||1; mn-=r*0.06; mx+=r*0.06; const R=mx-mn;
+  const hist=a=>{const c=new Array(bins).fill(0);a.forEach(v=>{let b=Math.floor((v-mn)/R*bins);b=b<0?0:b>=bins?bins-1:b;c[b]++;});return c;};
+  const ca=hist(A),cb=hist(B),cmax=Math.max(...ca,...cb)||1;
+  const bx=b=>pad.l+((b+0.5)/bins)*(W-pad.l-pad.r), vx=v=>pad.l+(v-mn)/R*(W-pad.l-pad.r), Y=c=>pad.t+(1-c/cmax)*(H-pad.t-pad.b);
+  ctx.clearRect(0,0,W,H);
+  ctx.strokeStyle=COL.grid;ctx.lineWidth=1;for(let i=0;i<=3;i++){const y=pad.t+i*(H-pad.t-pad.b)/3;ctx.beginPath();ctx.moveTo(pad.l,y);ctx.lineTo(W-pad.r,y);ctx.stroke();}
+  const area=(c,stroke,fill)=>{ctx.beginPath();ctx.moveTo(bx(0),Y(0));for(let b=0;b<bins;b++)ctx.lineTo(bx(b),Y(c[b]));ctx.lineTo(bx(bins-1),Y(0));ctx.closePath();ctx.fillStyle=fill;ctx.fill();
+    ctx.beginPath();for(let b=0;b<bins;b++)b?ctx.lineTo(bx(b),Y(c[b])):ctx.moveTo(bx(b),Y(c[b]));ctx.strokeStyle=stroke;ctx.lineWidth=2.2;ctx.stroke();};
+  area(cb,COL.cls,COL.clsf); area(ca,COL.pid,COL.pidf);
+  if(mn<0&&mx>0){const z=vx(0);ctx.strokeStyle='rgba(255,255,255,.22)';ctx.setLineDash([3,3]);ctx.beginPath();ctx.moveTo(z,pad.t);ctx.lineTo(z,H-pad.b);ctx.stroke();ctx.setLineDash([]);}
+  const med=a=>{const s=a.slice().sort((x,y)=>x-y);return s[Math.floor(s.length/2)];};
+  [[B,COL.cls],[A,COL.pid]].forEach(([a,c])=>{const x=vx(med(a));ctx.strokeStyle=c;ctx.setLineDash([4,3]);ctx.beginPath();ctx.moveTo(x,pad.t);ctx.lineTo(x,H-pad.b);ctx.stroke();ctx.setLineDash([]);});
+  ctx.fillStyle=COL.ax;ctx.font='10px ui-monospace,monospace';
+  for(let i=0;i<=4;i++){const v=mn+i*R/4;ctx.fillText(Math.round(v),pad.l+i*(W-pad.l-pad.r)/4-12,H-16);}
+  ctx.fillText('net welfare per season',W/2-58,H-3);
+}
+
+const fmtK=v=>{const a=Math.abs(v);if(a>=1e6)return(v/1e6).toFixed(2)+'M';if(a>=1000)return(v/1000).toFixed(a%1000===0?0:1)+'k';return Math.round(v).toString();};
+
+const val=id=>+document.getElementById(id).value;
+function buildParams(){
+  const pr=PRODUCTS[document.getElementById('cls').value];
+  return { T:val('shelf'), I0:val('invR'), footfall:val('foot'), depth:1-val('depth')/100,
+    V0:140, cost:60, p0:100, noise:0.30,
+    eta:pr.eta, decay:pr.decay, drop:pr.drop, gamma:pr.gamma,
+    Kp:val('kp')/1000, Ki:val('ki')/1000, Kd:val('kd')/1000 };
+}
+function setGain(id,raw){const e=document.getElementById(id);e.value=raw;e.dispatchEvent(new Event('input'));}
+
+function runSim(){
+  const P=buildParams();
+  const N=Math.max(20,Math.min(2000,+document.getElementById('runs').value));
+  const mc=monteCarlo(P,N);
+
+  const vals=[],ideal=[]; for(let t=0;t<P.T;t++){vals.push(dayValue(P,t));ideal.push(idealStock(P,t));}
+  document.getElementById('decayLab').textContent = P.decay==='linear' ? 'linearly' : 'exponentially';
+  bandPanel(document.getElementById('priceC'),132,
+    [{...mc.pidPrice,color:COL.pid,fill:COL.pidf},{...mc.clsPrice,color:COL.cls,fill:COL.clsf}],
+    [{data:vals,color:COL.val,dash:true}],{yfmt:v=>'$'+Math.round(v)});
+  bandPanel(document.getElementById('invC'),132,
+    [{...mc.pidInv,color:COL.pid,fill:COL.pidf},{...mc.clsInv,color:COL.cls,fill:COL.clsf}],
+    [{data:ideal,color:COL.good,dash:true}],{showX:true,y0:true});
+  distPanel(document.getElementById('distC'),300,mc.pidWel,mc.clsWel);
+
+  const gap=mc.pidAvg-mc.clsAvg;
+  document.getElementById('kGap').textContent='+'+fmtK(gap);
+  document.getElementById('kGapNote').textContent='+'+fmtK(mc.suppressed)+' total over '+N+' runs';
+  document.getElementById('kWin').textContent=Math.round(mc.winRate*100)+'%';
+  document.getElementById('kWp').textContent=Math.round(mc.pidWaste/P.I0*100)+'%';
+  document.getElementById('kWc').textContent=Math.round(mc.clsWaste/P.I0*100)+'%';
+  document.getElementById('kNp').textContent=fmtK(mc.pidAvg);
+  document.getElementById('kNc').textContent=fmtK(mc.clsAvg);
+}
+
+const labels={shelf:['tv',1,0],invR:['iv',1,0],foot:['fv',1,0],depth:['dv',1,0],kp:['kpv',1000,3],ki:['kiv',1000,3],kd:['kdv',1000,3]};
+Object.entries(labels).forEach(([id,[l,d,p]])=>{const e=document.getElementById(id);e.oninput=()=>document.getElementById(l).textContent=(e.value/d).toFixed(p);});
+function applyProduct(){const pr=PRODUCTS[document.getElementById('cls').value];setGain('shelf',pr.shelf);setGain('invR',pr.stock);setGain('foot',pr.foot);}
+document.getElementById('cls').onchange=()=>{applyProduct();runSim();};
+document.getElementById('run').onclick=runSim;
+document.getElementById('tune').onclick=()=>{
+  const btn=document.getElementById('tune'), note=document.getElementById('tuneNote');
+  btn.disabled=true; btn.textContent='Tuning…'; note.textContent='';
+  setTimeout(()=>{                                   // yield so the button repaints first
+    const best=autoTunePID(buildParams());
+    setGain('kp',Math.round(best.Kp*1000));
+    setGain('ki',Math.round(best.Ki*1000));
+    setGain('kd',Math.round(best.Kd*1000));
+    runSim();
+    btn.disabled=false; btn.textContent='Auto-tune ✦';
+    note.textContent='✓ tuned Kp='+best.Kp.toFixed(2)+' Ki='+best.Ki.toFixed(3)+' Kd='+best.Kd.toFixed(2);
+  },20);
+};
+let rt;window.addEventListener('resize',()=>{clearTimeout(rt);rt=setTimeout(runSim,160);});
+applyProduct(); runSim();
 </script>
 </body>
 </html>

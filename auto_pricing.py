@@ -1,296 +1,260 @@
 # coding: utf-8
- 
-# 加入圖表功能
- 
-# In[52]:
- 
+"""
+PID-controlled perishable pricing — NTU Fintech Hackathon 2016.
+
+A grocery item is stocked with a fixed shelf life.  Its perceived value decays
+as it ages toward the expiration date.  We compare two pricing strategies:
+
+  * Classical clearance  : hold the sticker price flat, then apply one partial
+                           and one deep markdown only near the expiry date
+                           ("reduced to clear").  A lot of stock spoils unsold.
+  * PID controller       : continuously ease the price down so that inventory
+                           tracks an ideal linear sell-down to zero at expiry,
+                           balancing customer happiness (consumer surplus)
+                           against shop happiness (margin minus spoilage).
+
+Running the season many times (Monte-Carlo) shows the total surplus the
+classical approach leaves on the table.
+
+This script is the reference implementation behind demo.html — the two use the
+same model, so the browser demo shows exactly what this script computes.
+
+    pip install matplotlib numpy
+    python auto_pricing.py
+"""
+
+import math
+import random
 import matplotlib.pyplot as plt
- 
- 
-# PID控制函數
- 
-# In[53]:
- 
-def pidcontrol(x,target,h=1,Ki=1,Kd=1,Kp=0.005,ie=0,de=0):
-    e=target-x
-    i=Ki*1*h*e+ie
-    d=Kd*1*(e-de)/h
- 
-    return Kp*(e+i+d),e,h*e
- 
- 
-# 初始輸入數值
- 
-# In[84]:
- 
-print("initial price:",end='')
-x=int(input())
-print("initial needs:",end='')
-need0=int(input())
-print("the product kind:",end='')
-productclass=input()
-print("the first situation")
-print("the left over production rate:",end='')
-b1=int(input())
-print("the increased needs rate:",end='')
-g1=int(input())
-print("the second situation")
-print("the left over production rate:",end='')
-b2=int(input())
-print("the increased needs rate:",end='')
-g2=int(input())
-print("the third situation")
-print("the left over production rate:",end='')
-b3=int(input())
-print("the increased needs rate:",end='')
-g3=int(input())
-demandslope=0
-productcase=0
-target=['']*4
-need=['']*4
-target[0]=x
- 
-if productclass=="a":
-    productcase=0.001
-    target[1]=x-target[0]*(b1/150)+target[0]*g1/150
-    target[2]=target[1]-target[0]*(b2/150)+target[0]*g2/150
-    target[3]=target[2]-target[0]*(b3/150)+target[0]*g3/150
-    need[1]=x+x*(b1/150)-x*g1/150
-    need[2]=need[1]+need[1]*(b2/150)-need[1]*g2/150
-    need[3]=need[2]+need[2]*(b3/150)-need[2]*g3/150
-    demandslope=-1.5
-elif productclass=="b":
-    productcase=0.005
-    target[1]=x-target[0]*(b1/200)+target[0]*g1/200
-    target[2]=target[1]-target[0]*(b2/200)+target[0]*g2/200
-    target[3]=target[2]-target[0]*(b3/200)+target[0]*g3/200
-    need[1]=x+need0*(b1/200)+need0*g1/200
-    need[2]=need[1]+need0*(b2/200)+need0*g2/200
-    need[3]=need[2]+need0*(b3/200)+need0*g3/200
-    demandslope=-1
-else:
-    productcase=0.01
-    target[1]=x-x*(b1/400)+x*g1/400
-    target[2]=target[1]-target[1]*(b2/400)+target[1]*g2/400
-    target[3]=target[2]-target[2]*(b3/400)+target[2]*g3/400
-    need[1]=x+x*(b1/400)-x*g1/400
-    need[2]=need[1]+need[1]*(b2/400)-need[1]*g2/400
-    need[3]=need[2]+need[2]*(b3/400)-need[2]*g3/400
-    demandslope=-0.5
-time=1
-de=0
-ie=0
-oldway=0
-statisdem=0
-statissup=0
- 
-need[0]=need0
- 
- 
- 
- 
-# 初步純數值運算
- 
-# In[85]:
- 
-xx=x
-time=1
-de=0
-ie=0
-oldway=0
-statisdem=0
-statissup=0
-number=['']*192
-price=['']*192
-demandnew=['']*192
-demandold=['']*192
-supplynew=['']*192
-supplyold=['']*192
-for n in range(4):
-    for h in range(1,49):
-        needtemp=0
-        print(time,xx)
-        number[time-1]=time
-        price[time-1]=xx
-        xx+=pidcontrol(xx,target[n],h,Kp=productcase,de=de,ie=ie)[0]
-        de=pidcontrol(xx,target[n],h,Kp=productcase,de=de,ie=ie)[1]
-        ie=pidcontrol(xx,target[n],h,Kp=productcase,de=de,ie=ie)[2]
-        if ((xx-target[n])/demandslope)+need[n]<(xx-target[n])+need[n]:
-            needtemp=((xx-target[n])/demandslope)+need[n]
-        else:
-            needtemp=(xx-target[n])+need[n]
-        demandm=0
-        olddem=0
-        supplym=0
-        oldsup=0
-        for m in range(int(needtemp)):
-            demandm+=(demandslope*(m-need[n])+target[n])-xx
-            if (m-need[n])+target[n]>0:
-                supplym+=xx-((m-need[n])+target[n])
-            else:
-                supplym+=xx 
-        if n!=0:
-            for m in range(int(need[n-1])):
-                olddem+=(demandslope*(m-need[n])+target[n])-target[n-1]
-                if (m-need[n])+target[n]>0:
-                    oldsup+=target[n-1]-((m-need[n])+target[n])
-                else:
-                    oldsup+=target[n-1]
-        else:
-            for m in range(int(need[0])):
-                olddem+=(demandslope*(m-need[0])+target[0])-target[0]
-                if (m-need[0])+target[0]>0:
-                    oldsup+=target[0]-((m-need[0])+target[0])
-                else:
-                    oldsup+=target[0]
- 
-        demandnew[time-1]=demandm
-        demandold[time-1]=olddem
-        supplynew[time-1]=supplym
-        supplyold[time-1]=oldsup
-        statisdem+=demandm-olddem
-        statissup+=supplym-oldsup
-        time+=1
- 
- 
- 
- 
-# 價格變動圖表
- 
-# In[86]:
- 
-get_ipython().magic('matplotlib inline')
-plt.plot(number,price)
-plt.axvline(48,color='g', linestyle='--')
-plt.axvline(96,color='g', linestyle='--')
-plt.axvline(144,color='g', linestyle='--')
-plt.axvline(192,color='g', linestyle='--')
-plt.axis([0,200,0,max(price)+10])
-plt.show()
-print(target[0],'->',target[1],'->',target[2],'->',target[3])
- 
- 
-# 消費者剩餘，舊版新版比較差異圖表
- 
-# In[87]:
- 
-sumdemand=list(map(lambda x,y:x-y,demandnew,demandold))
-plt.axvline(48,color='g', linestyle='--')
-plt.axvline(96,color='g', linestyle='--')
-plt.axvline(144,color='g', linestyle='--')
-plt.axvline(192,color='g', linestyle='--')
-plt.plot(number,demandnew,number,demandold,'r',number,sumdemand,'k')
-plt.show()
- 
- 
-# 消費者剩餘差異的累計圖表
- 
-# In[88]:
- 
-sumdemanda=['']*192
-for n in range(len(sumdemand)-1,-1,-1):
-    sumdemanda[n]=sum(sumdemand[0:n])
-plt.axvline(48,color='g', linestyle='--')
-plt.axvline(96,color='g', linestyle='--')
-plt.axvline(144,color='g', linestyle='--')
-plt.axvline(192,color='g', linestyle='--')
-plt.plot(number,sumdemanda,'k')
-plt.show()
-print(sumdemand[-1])
- 
- 
-# 生產者剩餘，舊版新版比較差異圖表
- 
-# In[89]:
- 
-sumsupply=list(map(lambda x,y:x-y,supplynew,supplyold))
-plt.axvline(48,color='g', linestyle='--')
-plt.axvline(96,color='g', linestyle='--')
-plt.axvline(144,color='g', linestyle='--')
-plt.axvline(192,color='g', linestyle='--')
-plt.plot(number,supplynew,number,supplyold,'r',number,sumsupply,'k')
-plt.show()
- 
- 
-# 生產者剩餘差異的累計圖表
- 
-# In[90]:
- 
-sumsupplya=['']*192
-for n in range(len(sumsupply)-1,-1,-1):
-    sumsupplya[n]=sum(sumsupply[0:n])
-plt.axvline(48,color='g', linestyle='--')
-plt.axvline(96,color='g', linestyle='--')
-plt.axvline(144,color='g', linestyle='--')
-plt.axvline(192,color='g', linestyle='--')
-plt.plot(number,sumsupplya,'k')
-plt.show()
-print(sumsupply[-1])
- 
- 
-# 總剩餘，舊版新版比較差異圖表
- 
-# In[91]:
- 
-sumnew=list(map(lambda x,y:x+y,supplynew,demandnew))
-sumold=list(map(lambda x,y:x+y,supplyold,demandold))
-suminall=list(map(lambda x,y:x-y,sumnew,sumold))
-plt.axvline(48,color='g', linestyle='--')
-plt.axvline(96,color='g', linestyle='--')
-plt.axvline(144,color='g', linestyle='--')
-plt.axvline(192,color='g', linestyle='--')
-plt.plot(number,sumnew,number,sumold,'r',number,suminall,'k')
-plt.show()
- 
- 
-# 總剩餘差異的累計圖表
- 
-# In[92]:
- 
-suminalla=['']*192
-for n in range(len(suminall)-1,-1,-1):
-    suminalla[n]=sum(suminall[0:n])
-plt.axvline(48,color='g', linestyle='--')
-plt.axvline(96,color='g', linestyle='--')
-plt.axvline(144,color='g', linestyle='--')
-plt.axvline(192,color='g', linestyle='--')
-plt.plot(number,suminalla,'k')
-plt.show()
-print(suminalla[-1])
- 
- 
-# In[74]:
- 
-open('data.txt', 'w').close()
-f=open('data.txt','a')
-f.write("class : ")
-f.write(productclass)
-f.write(' . ')
-f.write('initial price : ')
-f.write(str(x))
-f.write(' . ')
-f.write('initial needs : ')
-f.write(str(need0))
-f.write('\n')
-for i in range(3):
-    f.write(str(number[i]))
-    f.write(' . ')
-    f.write(str(target[i]))
-    f.write(' . ')
-    f.write(str(need[i]))
-    f.write('\n')
-f.write
-for n in range(192):
-    f.write(str(number[n]))
-    f.write(' . ')
-    f.write(str(price[n]))
-    f.write(' . ')
-    f.write(str(demandnew[n]))
-    f.write(' . ')
-    f.write(str(demandold[n]))
-    f.write(' . ')
-    f.write(str(supplynew[n]))
-    f.write(' . ')
-    f.write(str(supplyold[n]))
-    f.write("\n")
-f.close()
+
+# ---------------------------------------------------------------- parameters --
+# Example grocery items. The value-decay shape and rate come from the
+# willingness-to-pay-for-freshness literature: produce/dairy lose value roughly
+# LINEARLY, while meat/seafood lose it ~EXPONENTIALLY as they near expiry
+# (Sumner et al.; Ghare & Schrader 1963 deteriorating-inventory model).
+#   eta   = price elasticity of demand     drop  = fraction of value lost by expiry
+#   decay = "linear" | "exp"               gamma = ideal sell-down curvature
+#                                                   (0 = linear; higher = clear faster while fresh)
+PRODUCTS = {
+    "milk":   dict(name="Milk — dairy staple",  eta=0.35, decay="linear", drop=0.45, gamma=0.8, shelf=14, stock=240, foot=55),
+    "banana": dict(name="Bananas — produce",    eta=0.60, decay="linear", drop=0.55, gamma=1.1, shelf=8,  stock=200, foot=50),
+    "bread":  dict(name="Bread — bakery",       eta=0.70, decay="exp",    drop=0.55, gamma=1.8, shelf=5,  stock=160, foot=55),
+    "fish":   dict(name="Fresh fish — seafood", eta=1.10, decay="exp",    drop=0.62, gamma=2.4, shelf=3,  stock=90,  foot=48),
+}
+PRODUCT = "banana"          # <- pick the item to simulate
+
+
+def make_params(key):
+    pr = PRODUCTS[key]
+    return dict(
+        T=pr["shelf"], I0=pr["stock"], footfall=pr["foot"],
+        V0=140.0, cost=60.0, p0=100.0,     # fresh value, unit cost, list price
+        depth=0.5,                          # classical final markdown -> depth * p0
+        noise=0.30,                         # daily demand noise amplitude
+        eta=pr["eta"], decay=pr["decay"], drop=pr["drop"], gamma=pr["gamma"],
+        Kp=0.200, Ki=0.005, Kd=0.020,       # starting PID gains (auto-tuned in main)
+    )
+
+
+def clamp01(x):
+    return 0.0 if x < 0 else 1.0 if x > 1 else x
+
+
+def day_value(P, t):
+    """Item value as it ages: linear (produce/dairy) or exponential (meat/seafood).
+    Both shapes start at V0 and reach V0*(1-drop) at expiry."""
+    tau = t / P["T"]
+    if P["decay"] == "linear":
+        return P["V0"] * (1 - P["drop"] * tau)
+    return P["V0"] * (1 - P["drop"]) ** tau
+
+
+def ideal_stock(P, t):
+    """Ideal sell-down (PID setpoint): convex depletion from deteriorating-inventory
+    theory (dI/dt = -D - theta*I, I(T)=0) -> sell faster while the item is fresh."""
+    tau, g = t / P["T"], P["gamma"]
+    if g < 1e-6:
+        return P["I0"] * (1 - tau)
+    return P["I0"] * (math.exp(g * (1 - tau)) - 1) / (math.exp(g) - 1)
+
+
+def classical_price(p0, t, T, depth):
+    """Flat list price, then one partial and one deep markdown in the final stretch.
+    r = (t+1)/T (fraction of shelf life elapsed by end of day t) so even
+    short-life items still trigger the markdown."""
+    r = (t + 1) / T
+    if r <= 0.7:
+        return p0                    # full price for most of the shelf life
+    if r <= 0.9:
+        return p0 * (1 + depth) / 2  # first, partial reduction
+    return p0 * depth                # final "reduced to clear" sticker
+
+
+def simulate(strategy, P, seed):
+    """Run one season under a given demand realization. Returns a result dict."""
+    rng = random.Random(seed)
+    T, I0, footfall = P["T"], P["I0"], P["footfall"]
+    V0, cost, p0, eta = P["V0"], P["cost"], P["p0"], P["eta"]
+    depth, noise = P["depth"], P["noise"]
+    Kp, Ki, Kd = P["Kp"], P["Ki"], P["Kd"]
+
+    inv = I0
+    integral = prev_err = 0.0
+    price = prev_p = p0
+    CS = PS = cum = effort = 0.0
+    sens = 0.5 + eta                 # elastic goods react more to price
+
+    days, prices, invs, vals, targets, cums = [], [], [], [], [], []
+    for t in range(T):
+        V = day_value(P, t)
+        target = ideal_stock(P, t)   # convex ideal sell-down (sell faster while fresh)
+
+        if strategy == "classical":
+            price = classical_price(p0, t, T, depth)
+        else:                        # PID: excess stock vs target pushes price down
+            e = inv - target
+            integral += e
+            der = e - prev_err
+            prev_err = e
+            u = -(Kp * e + Ki * integral + Kd * der)
+            price = max(cost * 0.5, min(p0, price + u))
+
+        effort += (price - prev_p) ** 2          # control effort (price volatility)
+        prev_p = price
+
+        # Demand: buyers whose willingness-to-pay (uniform up to V) beats price.
+        frac = clamp01((V - price) / V * sens)
+        q = footfall * (1 + noise * (rng.random() * 2 - 1)) * frac
+        q = max(0.0, min(inv, q))
+        inv -= q
+
+        PS += (price - cost) * q                  # shop margin
+        CS += q * (V - price) / 2                 # consumer surplus (triangle)
+        cum += (price - cost) * q + q * (V - price) / 2
+
+        days.append(t); prices.append(price); invs.append(inv)
+        vals.append(V); targets.append(target); cums.append(cum)
+
+    waste = inv                                   # unsold stock spoils
+    waste_cost = waste * cost
+    cums[-1] -= waste_cost                         # spoilage hits the books at expiry
+    return dict(days=days, prices=prices, invs=invs, vals=vals, targets=targets,
+                cums=cums, CS=CS, PS=PS, waste=waste, effort=effort,
+                welfare=CS + PS - waste_cost)
+
+
+def monte_carlo(P, n_runs):
+    """Same demand seed per run for both strategies -> fair head-to-head."""
+    pid_tot = cls_tot = pid_waste = cls_waste = 0.0
+    diffs = []
+    for i in range(n_runs):
+        pid = simulate("pid", P, 1000 + i)
+        cls = simulate("classical", P, 1000 + i)
+        pid_tot += pid["welfare"]; cls_tot += cls["welfare"]
+        pid_waste += pid["waste"]; cls_waste += cls["waste"]
+        diffs.append(pid["welfare"] - cls["welfare"])
+    wins = sum(1 for d in diffs if d > 0)
+    return dict(pid_avg=pid_tot / n_runs, cls_avg=cls_tot / n_runs,
+                suppressed=pid_tot - cls_tot, diffs=diffs,
+                pid_waste=pid_waste / n_runs, cls_waste=cls_waste / n_runs,
+                win_rate=wins / n_runs)
+
+
+# --------------------------------------------------------------- auto-tuning --
+# Objective: maximise mean net welfare while penalising price volatility
+# (control effort), so the "optimal" gains give smooth, stable pricing rather
+# than maximally aggressive markdowns.
+LAMBDA = 0.5
+
+
+def tune_objective(P, Kp, Ki, Kd, M):
+    s = 0.0
+    for i in range(M):
+        r = simulate("pid", dict(P, Kp=Kp, Ki=Ki, Kd=Kd), 1000 + i)
+        s += r["welfare"] - LAMBDA * r["effort"]
+    return s / M
+
+
+def auto_tune(P, M=60):
+    """Compass / pattern search with step halving over the three PID gains."""
+    bounds = dict(Kp=(0.01, 1.2), Ki=(0.0, 0.3), Kd=(0.0, 1.5))
+    step = dict(Kp=0.3, Ki=0.02, Kd=0.3)
+    min_step = dict(Kp=0.005, Ki=0.0005, Kd=0.005)
+    best = dict(Kp=P["Kp"], Ki=P["Ki"], Kd=P["Kd"])
+    best_val = tune_objective(P, best["Kp"], best["Ki"], best["Kd"], M)
+    for _ in range(120):
+        improved = False
+        for k in ("Kp", "Ki", "Kd"):
+            for d in (1, -1):
+                cand = dict(best)
+                lo, hi = bounds[k]
+                cand[k] = min(hi, max(lo, best[k] + d * step[k]))
+                if cand[k] == best[k]:
+                    continue
+                v = tune_objective(P, cand["Kp"], cand["Ki"], cand["Kd"], M)
+                if v > best_val + 1e-6:
+                    best_val, best, improved = v, cand, True
+        if not improved:
+            for k in step:
+                step[k] *= 0.5
+            if all(step[k] < min_step[k] for k in step):
+                break
+    return best
+
+
+def main():
+    P = make_params(PRODUCT)
+    n_runs = 300
+    print("Product          : %s  (%s decay, %d-day shelf)\n"
+          % (PRODUCTS[PRODUCT]["name"], P["decay"], P["T"]))
+
+    # Auto-tune the PID gains for this scenario, then adopt them.
+    before = monte_carlo(P, n_runs)["pid_avg"]
+    best = auto_tune(P)
+    P.update(best)
+    print("Auto-tuned gains : Kp=%.3f  Ki=%.4f  Kd=%.3f" % (best["Kp"], best["Ki"], best["Kd"]))
+    print("PID welfare/run  : %.0f (default gains) -> %.0f (auto-tuned)\n"
+          % (before, monte_carlo(P, n_runs)["pid_avg"]))
+
+    # One representative season for the trajectory charts.
+    pid = simulate("pid", P, 1000)
+    cls = simulate("classical", P, 1000)
+    mc = monte_carlo(P, n_runs)
+
+    print("PID net welfare / run       : %9.0f" % mc["pid_avg"])
+    print("Classical net welfare / run : %9.0f" % mc["cls_avg"])
+    print("Surplus classical suppresses: %9.0f  (over %d runs)" % (mc["suppressed"], n_runs))
+    print("PID wins in %.0f%% of runs" % (mc["win_rate"] * 100))
+    print("Avg spoilage  PID %.1f u  vs  classical %.1f u" % (mc["pid_waste"], mc["cls_waste"]))
+
+    fig, ax = plt.subplots(2, 2, figsize=(12, 8))
+
+    # 1) Price trajectory
+    ax[0, 0].plot(pid["days"], pid["prices"], label="PID price", color="#1f77b4")
+    ax[0, 0].plot(cls["days"], cls["prices"], label="Classical price", color="#d62728")
+    ax[0, 0].plot(pid["days"], pid["vals"], "--", label="Item value", color="#888")
+    ax[0, 0].set_title("Price trajectory"); ax[0, 0].set_xlabel("day"); ax[0, 0].legend()
+
+    # 2) Inventory remaining
+    ax[0, 1].plot(pid["days"], pid["invs"], label="PID (clears)", color="#1f77b4")
+    ax[0, 1].plot(cls["days"], cls["invs"], label="Classical (spoils)", color="#d62728")
+    ax[0, 1].plot(pid["days"], pid["targets"], "--", label="Ideal sell-down", color="#2ca02c")
+    ax[0, 1].set_title("Inventory remaining"); ax[0, 1].set_xlabel("day"); ax[0, 1].legend()
+
+    # 3) Cumulative net welfare
+    ax[1, 0].plot(pid["days"], pid["cums"], label="PID", color="#1f77b4")
+    ax[1, 0].plot(cls["days"], cls["cums"], label="Classical", color="#d62728")
+    ax[1, 0].set_title("Cumulative net welfare"); ax[1, 0].set_xlabel("day"); ax[1, 0].legend()
+
+    # 4) Monte-Carlo distribution of PID - Classical welfare
+    ax[1, 1].hist(mc["diffs"], bins=24, color="#2ca02c")
+    ax[1, 1].axvline(0, color="k", linestyle="--")
+    ax[1, 1].set_title("Monte-Carlo: PID - Classical welfare per run")
+    ax[1, 1].set_xlabel("welfare difference")
+
+    plt.tight_layout()
+    plt.show()
+
+
+if __name__ == "__main__":
+    main()
