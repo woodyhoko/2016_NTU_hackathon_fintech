@@ -76,6 +76,37 @@
   button.ghost:hover{background:rgba(56,189,248,.1)}
   #tuneNote{font-size:10.5px;color:var(--good);min-height:13px;font-variant-numeric:tabular-nums}
   .grp-tag{width:100%;font-size:10px;text-transform:uppercase;letter-spacing:.1em;color:var(--faint);margin-bottom:-6px}
+
+  /* live price tags */
+  .tagcard{margin-bottom:18px}
+  .tagctl{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin:4px 0 12px}
+  .tagctl button{padding:7px 16px;font-size:12px}
+  .tagctl .dayLab{font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
+  #dayScrub{flex:1;min-width:160px;accent-color:var(--pid);cursor:pointer}
+  .tags{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+  @media(max-width:620px){.tags{grid-template-columns:1fr}}
+  .ptag{position:relative;border-radius:14px;padding:18px 18px 16px;color:#1a1205;
+        background:linear-gradient(165deg,#fffef5,#ffe9c7);box-shadow:0 10px 30px rgba(0,0,0,.45);
+        border:2px solid #f4c674;overflow:hidden;transition:transform .25s}
+  .ptag.cls{background:linear-gradient(165deg,#fff5f5,#ffd9dc);border-color:#f3a3ab}
+  .ptag .ribbon{position:absolute;top:12px;right:-30px;transform:rotate(38deg);background:#e23b4e;color:#fff;
+        font-weight:800;font-size:11px;letter-spacing:.04em;padding:4px 34px;box-shadow:0 2px 8px rgba(0,0,0,.3)}
+  .ptag .who{font-size:10px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:#9a6a1e}
+  .ptag.cls .who{color:#b0434f}
+  .ptag .pname{font-size:15px;font-weight:800;margin:2px 0 6px;color:#241a08}
+  .ptag .price{display:flex;align-items:baseline;gap:10px}
+  .ptag .cur{font-size:42px;font-weight:900;letter-spacing:-.02em;line-height:1;font-variant-numeric:tabular-nums}
+  .ptag .was{font-size:16px;color:#9b8a6a;text-decoration:line-through;font-weight:700}
+  .ptag.cls .was{color:#b58e90}
+  .ptag .off{display:inline-block;margin-top:8px;background:#e23b4e;color:#fff;font-weight:800;font-size:12px;
+        padding:3px 10px;border-radius:7px}
+  .ptag .meta{display:flex;justify-content:space-between;font-size:11.5px;font-weight:700;color:#6b5a36;margin-top:12px}
+  .ptag.cls .meta{color:#8a5a5e}
+  .ptag .barlab{font-size:9.5px;text-transform:uppercase;letter-spacing:.08em;color:#8a774d;margin:10px 0 3px}
+  .ptag.cls .barlab{color:#a86a6f}
+  .ptag .bar{height:8px;border-radius:5px;background:rgba(0,0,0,.12);overflow:hidden}
+  .ptag .bar i{display:block;height:100%;border-radius:5px;background:linear-gradient(90deg,#f59e0b,#22c55e);transition:width .3s}
+  .ptag.expired{filter:grayscale(.5) brightness(.92)}
 </style>
 </head>
 <body>
@@ -140,6 +171,39 @@
           <button id="run">Run ▸</button>
         </div>
         <div id="tuneNote"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- live price tags -->
+  <div class="card tagcard">
+    <h2>Live shelf price tag — watch it adjust day by day</h2>
+    <div class="desc">One representative season, replayed in real time. The <b style="color:var(--pid)">PID</b> tag eases the sticker down continuously to clear stock; the <b style="color:var(--cls)">classical</b> tag holds firm, then crashes in the final days.</div>
+    <div class="tagctl">
+      <button id="tagPlay" class="ghost">▶ Play</button>
+      <input id="dayScrub" type="range" min="0" max="0" value="0">
+      <span class="dayLab" id="dayLab">Day 1</span>
+    </div>
+    <div class="tags">
+      <div class="ptag pid" id="tagPID">
+        <div class="ribbon" id="pidRibbon">FRESH</div>
+        <div class="who">PID · continuous markdown</div>
+        <div class="pname" id="pidName">Product</div>
+        <div class="price"><span class="cur" id="pidCur">$100</span><span class="was" id="pidWas">$100</span></div>
+        <span class="off" id="pidOff">0% OFF</span>
+        <div class="meta"><span id="pidDays">— left</span><span id="pidStock">— in stock</span></div>
+        <div class="barlab">Freshness / item value</div>
+        <div class="bar"><i id="pidFresh" style="width:100%"></i></div>
+      </div>
+      <div class="ptag cls" id="tagCLS">
+        <div class="ribbon" id="clsRibbon">FRESH</div>
+        <div class="who">Classical · markdown-to-clear</div>
+        <div class="pname" id="clsName">Product</div>
+        <div class="price"><span class="cur" id="clsCur">$100</span><span class="was" id="clsWas">$100</span></div>
+        <span class="off" id="clsOff">0% OFF</span>
+        <div class="meta"><span id="clsDays">— left</span><span id="clsStock">— in stock</span></div>
+        <div class="barlab">Freshness / item value</div>
+        <div class="bar"><i id="clsFresh" style="width:100%"></i></div>
       </div>
     </div>
   </div>
@@ -353,7 +417,61 @@ function runSim(){
   document.getElementById('kWc').textContent=Math.round(mc.clsWaste/P.I0*100)+'%';
   document.getElementById('kNp').textContent=fmtK(mc.pidAvg);
   document.getElementById('kNc').textContent=fmtK(mc.clsAvg);
+
+  buildTags(P);
 }
+
+// ---- live price-tag animation (one representative season, replayed day by day) ----
+let tagData=null, tagDay=0, tagTimer=null;
+function buildTags(P){
+  const pid=simulate('pid',P,1234), cls=simulate('classical',P,1234);
+  const vals=[]; for(let t=0;t<P.T;t++) vals.push(dayValue(P,t));
+  const name=PRODUCTS[document.getElementById('cls').value].name;
+  tagData={pid,cls,vals,P,name};
+  const scrub=document.getElementById('dayScrub');
+  scrub.max=P.T-1; if(tagDay>P.T-1)tagDay=P.T-1;
+  document.getElementById('pidName').textContent=name;
+  document.getElementById('clsName').textContent=name;
+  renderTag(tagDay);
+}
+function setTag(pre,price,p0,inv,I0,daysLeft,freshFrac){
+  const off=Math.max(0,Math.round((1-price/p0)*100));
+  document.getElementById(pre+'Cur').textContent='$'+price.toFixed(price<10?1:0);
+  document.getElementById(pre+'Was').textContent='$'+Math.round(p0);
+  const offEl=document.getElementById(pre+'Off');
+  offEl.textContent=off>0?off+'% OFF':'full price'; offEl.style.opacity=off>0?'1':'.5';
+  document.getElementById(pre+'Days').textContent=daysLeft<=0?'expires today':daysLeft+' day'+(daysLeft===1?'':'s')+' left';
+  document.getElementById(pre+'Stock').textContent=Math.round(inv)+' in stock';
+  document.getElementById(pre+'Fresh').style.width=(Math.max(0,Math.min(1,freshFrac))*100).toFixed(0)+'%';
+  document.getElementById(pre+'Ribbon').textContent =
+    daysLeft<=0?'EXPIRED':daysLeft<=1?'LAST DAY':off>=40?'CLEARANCE':off>0?'REDUCED':'FRESH';
+}
+function renderTag(day){
+  if(!tagData)return;
+  const {pid,cls,vals,P}=tagData, t=Math.max(0,Math.min(day,P.T-1)), daysLeft=P.T-1-t;
+  setTag('pid',pid.arrPrice[t],P.p0,pid.arrInv[t],P.I0,daysLeft,vals[t]/P.V0);
+  setTag('cls',cls.arrPrice[t],P.p0,cls.arrInv[t],P.I0,daysLeft,vals[t]/P.V0);
+  document.getElementById('tagPID').classList.toggle('expired',daysLeft<=0);
+  document.getElementById('tagCLS').classList.toggle('expired',daysLeft<=0);
+  document.getElementById('dayLab').textContent='Day '+(t+1)+' / '+P.T;
+  document.getElementById('dayScrub').value=t;
+}
+function playTags(){
+  const btn=document.getElementById('tagPlay');
+  if(tagTimer){clearInterval(tagTimer);tagTimer=null;btn.textContent='▶ Play';return;}
+  if(!tagData)return;
+  if(tagDay>=tagData.P.T-1)tagDay=0;          // restart if parked at the end
+  btn.textContent='❚❚ Pause'; renderTag(tagDay);
+  tagTimer=setInterval(()=>{
+    tagDay++; renderTag(tagDay);
+    if(tagDay>=tagData.P.T-1){clearInterval(tagTimer);tagTimer=null;btn.textContent='▶ Play';}
+  },560);
+}
+document.getElementById('tagPlay').onclick=playTags;
+document.getElementById('dayScrub').oninput=e=>{
+  if(tagTimer){clearInterval(tagTimer);tagTimer=null;document.getElementById('tagPlay').textContent='▶ Play';}
+  tagDay=+e.target.value; renderTag(tagDay);
+};
 
 const labels={shelf:['tv',1,0],invR:['iv',1,0],foot:['fv',1,0],depth:['dv',1,0],kp:['kpv',1000,3],ki:['kiv',1000,3],kd:['kdv',1000,3]};
 Object.entries(labels).forEach(([id,[l,d,p]])=>{const e=document.getElementById(id);e.oninput=()=>document.getElementById(l).textContent=(e.value/d).toFixed(p);});
