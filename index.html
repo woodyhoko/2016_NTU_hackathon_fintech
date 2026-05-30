@@ -49,6 +49,15 @@
     section{padding:34px 0}.c{padding:20px}
     .grid{grid-template-columns:1fr}
   }
+  .demo-card{border:1px solid var(--line);border-radius:16px;overflow:hidden;background:rgba(0,0,0,.22);box-shadow:0 24px 60px rgba(0,0,0,.45)}
+  .demo-bar{display:flex;align-items:center;gap:7px;padding:10px 15px;border-bottom:1px solid var(--line);background:rgba(255,255,255,.02)}
+  .demo-bar i{width:11px;height:11px;border-radius:50%;display:inline-block}
+  .demo-bar .t{margin-left:10px;font-size:12px;color:var(--muted);font-family:ui-monospace,Menlo,monospace}
+  .demo-frame{position:relative;width:100%;aspect-ratio:16/10;background:#0b0c12}
+  .demo-frame iframe{position:absolute;inset:0;width:100%;height:100%;border:0;display:block}
+  .demo-cap{display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between;margin-top:16px}
+  .demo-cap p{font-size:13px;color:var(--muted);max-width:560px}
+  @media(max-width:640px){.demo-frame{aspect-ratio:3/4}}
 </style></head>
 <body>
 <div class="bg"></div>
@@ -85,6 +94,19 @@
       <div class="b"><div class="n">0–4%</div><div class="l">spoilage under PID control</div></div>
       <div class="b"><div class="n r">42–62%</div><div class="l">spoilage under classical markdown</div></div>
       <div class="b"><div class="n">+CS / +PS</div><div class="l">positive net welfare every product</div></div>
+    </div>
+  </section>
+
+  <section>
+    <div class="lbl">live demo</div>
+    <div class="ttl">Tune the controller, watch it clear stock.</div>
+    <div class="demo-card">
+      <div class="demo-bar"><i style="background:#ff5f56"></i><i style="background:#ffbd2e"></i><i style="background:#27c93f"></i><span class="t">demo.html — PID markdown pricing</span></div>
+      <div class="demo-frame"><iframe src="demo.html" loading="lazy" title="Interactive PID markdown-pricing simulation"></iframe></div>
+    </div>
+    <div class="demo-cap">
+      <p>Adjust the gains and inventory and watch the price glide down in real time, clearing perishable stock right as it expires — head-to-head against classical markdown.</p>
+      <a class="btn p" href="demo.html">▶ Open full demo</a>
     </div>
   </section>
 
